@@ -1,0 +1,959 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// BLOC 1 : TABLES FONDAMENTALES (Aucune dépendance)
+// ============================================================================
+
+model User {
+  id                        Int      @id @default(autoincrement())
+  email                     String   @unique @db.VarChar(255)
+  telephone                 String   @unique @db.VarChar(20)
+  nom                       String   @db.VarChar(100)
+  prenom                    String   @db.VarChar(100)
+  role                      Role
+  statut                    StatutUser @default(ACTIF)
+  canalCommunicationPrefere Canal    @default(EMAIL) @map("canal_communication_prefere")
+  otpCode                   String?  @db.VarChar(6) @map("otp_code")
+  otpExpiration             DateTime? @map("otp_expiration")
+  derniereConnexion         DateTime? @map("derniere_connexion")
+  tentativesConnexion       Int      @default(0) @map("tentatives_connexion")
+  ipDerniereConnexion       String?  @db.VarChar(45) @map("ip_derniere_connexion")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  // Relations - NETTOYÉES ET COMPLÈTES
+  apiKeys                   ApiKey[]              @relation("UserApiKeys")
+  userTokens                UserToken[]
+  patient                   Patient?
+  medecin                   Medecin?
+  medecinValidations        Medecin[]             @relation("MedecinValidation")
+  logsActivite              LogActivite[]
+  validationsEffectuees     MedecinValidation[]   @relation("AdminValidation")
+  modificationsRendezVous   RendezVousHistorique[] @relation("RendezVousModification")
+  ticketsSupport            TicketSupport[]       @relation("TicketUser")
+  ticketsAssignes           TicketSupport[]       @relation("TicketAdmin")
+  signalementsEffectues     Signalement[]         @relation("SignalementUser")
+  signalementsTraites       Signalement[]         @relation("SignalementAdmin")
+  
+  // Relations pour les évaluations - AJOUTÉES
+  evaluationsDonnees        Evaluation[]          @relation("EvaluateurRelation")
+  evaluationsRecues         Evaluation[]          @relation("EvalueRelation")
+
+  @@index([email])
+  @@index([telephone])
+  @@index([role])
+  @@map("users")
+  ApiKey ApiKey[]
+  Annonce Annonce[] @relation("AnnonceAdmin")
+  Notification Notification[] @relation("NotificationUser")
+}
+
+model MedecinSpecialite {
+  id          Int     @id @default(autoincrement())
+  nom         String  @unique @db.VarChar(100)
+  description String? @db.Text
+  active      Boolean @default(true)
+
+  @@map("medecin_specialites")
+  MedecinHasSpecialite MedecinHasSpecialite[]
+}
+
+model Clinique {
+  id         Int       @id @default(autoincrement())
+  nom        String    @db.VarChar(200)
+  adresse    String    @db.Text
+  ville      String    @default("Abidjan") @db.VarChar(100)
+  telephone  String?   @db.VarChar(20)
+  email      String?   @db.VarChar(255)
+  latitude   Decimal?  @db.Decimal(10, 8)
+  longitude  Decimal?  @db.Decimal(11, 8)
+  horaires   Json?
+  services   Json?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([ville])
+  @@index([nom])
+  @@map("cliniques")
+  Disponibilite Disponibilite[]
+  MedecinClinique MedecinClinique[]
+  RendezVous RendezVous[]
+}
+
+model ParametrePlateforme {
+  id                     Int          @id @default(autoincrement())
+  cle                    String       @unique @db.VarChar(100)
+  valeur                 String?      @db.Text
+  typeValeur             TypeValeur   @default(STRING) @map("type_valeur")
+  description            String?      @db.Text
+  modifiable             Boolean      @default(true)
+  derniereModification   DateTime     @default(now()) @updatedAt @map("derniere_modification")
+  modifieParAdminId      Int?         @map("modifie_par_admin_id")
+
+  @@index([cle])
+  @@map("parametres_plateforme")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum Role {
+  PATIENT
+  MEDECIN
+  ADMIN
+}
+
+enum StatutUser {
+  ACTIF
+  SUSPENDU
+  DESACTIVE
+}
+
+enum Canal {
+  SMS
+  EMAIL
+}
+
+enum TypeValeur {
+  STRING
+  INT
+  BOOLEAN
+  JSON
+}
+
+// ============================================================================
+// BLOC 2 : TABLES DÉPENDANTES DES USERS
+// ============================================================================
+
+model ApiKey {
+  id                  Int       @id @default(autoincrement())
+  userId              Int       @map("user_id")
+  nomCle              String    @db.VarChar(100) @map("nom_cle")
+  cleApi              String    @unique @db.VarChar(255) @map("cle_api")
+  hashCle             String    @db.VarChar(64) @map("hash_cle")
+  permissions         Json?
+  ipAutorisees        Json?     @map("ip_autorisees")
+  nombreUtilisations  Int       @default(0) @map("nombre_utilisations")
+  limiteUtilisation   Int?      @map("limite_utilisation")
+  derniereUtilisation DateTime? @map("derniere_utilisation")
+  dateExpiration      DateTime? @map("date_expiration")
+  active              Boolean   @default(true)
+  userAgentCreation   String?   @db.Text @map("user_agent_creation")
+  ipCreation          String?   @db.VarChar(45) @map("ip_creation")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([hashCle])
+  @@index([active, dateExpiration])
+  @@map("api_keys")
+  User User[] @relation("UserApiKeys")
+  LogActivite LogActivite[]
+}
+
+model UserToken {
+  id                      Int       @id @default(autoincrement())
+  userId                  Int       @map("user_id")
+  typeToken               TypeToken @map("type_token")
+  tokenHash               String    @db.VarChar(64) @map("token_hash")
+  tokenPayload            Json?     @map("token_payload")
+  dateExpiration          DateTime  @map("date_expiration")
+  utilise                 Boolean   @default(false)
+  ipCreation              String?   @db.VarChar(45) @map("ip_creation")
+  userAgent               String?   @db.Text @map("user_agent")
+  derniereVerification    DateTime? @map("derniere_verification")
+  nombreUtilisations      Int       @default(0) @map("nombre_utilisations")
+  createdAt               DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([typeToken, dateExpiration])
+  @@index([dateExpiration])
+  @@map("user_tokens")
+}
+
+model Patient {
+  id                        Int      @id @default(autoincrement())
+  userId                    Int      @unique @map("user_id")
+  dateNaissance             DateTime? @map("date_naissance") @db.Date
+  sexe                      Sexe?
+  adresse                   String?  @db.Text
+  ville                     String   @default("Abidjan") @db.VarChar(100)
+  codePostal                String?  @db.VarChar(10) @map("code_postal")
+  groupeSanguin             String?  @db.VarChar(5) @map("groupe_sanguin")
+  poids                     Decimal? @db.Decimal(5, 2)
+  taille                    Int?
+  allergies                 String?  @db.Text // Chiffré
+  antecedentsMedicaux       String?  @db.Text @map("antecedents_medicaux") // Chiffré
+  traitementsEnCours        String?  @db.Text @map("traitements_en_cours") // Chiffré
+  abonneContenuPro          Boolean  @default(false) @map("abonne_contenu_pro")
+  dateDebutAbonnementPro    DateTime? @map("date_debut_abonnement_pro") @db.Date
+  dateFinAbonnementPro      DateTime? @map("date_fin_abonnement_pro") @db.Date
+  preferencesConfidentialite Json?   @map("preferences_confidentialite")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([ville])
+  @@map("patients")
+  RendezVous RendezVous[]
+  Ordonnance Ordonnance[]
+  ContenuProConversation ContenuProConversation[]
+}
+
+model Medecin {
+  id                      Int              @id @default(autoincrement())
+  userId                  Int              @unique @map("user_id")
+  numeroOrdre             String           @unique @db.VarChar(50) @map("numero_ordre")
+  diplomes                Json?            // URLs des documents
+  certifications          Json?            // URLs des documents
+  dateValidation          DateTime?        @map("date_validation") @db.Date
+  valideParAdminId        Int?             @map("valide_par_admin_id")
+  statutValidation        StatutValidation @default(EN_ATTENTE) @map("statut_validation")
+  motifRejet              String?          @db.Text @map("motif_rejet")
+  bio                     String?          @db.Text
+  experienceAnnees        Int?             @map("experience_annees")
+  languesParlees          Json?            @map("langues_parlees")
+  tarifConsultationBase   Decimal?         @db.Decimal(10, 2) @map("tarif_consultation_base")
+  accepteDomicile         Boolean          @default(false) @map("accepte_domicile")
+  accepteTeleconsultation Boolean          @default(false) @map("accepte_teleconsultation")
+  accepteclinique         Boolean          @default(true) @map("accepte_clinique")
+  noteMoyenne             Decimal          @default(0) @db.Decimal(2, 1) @map("note_moyenne")
+  nombreEvaluations       Int              @default(0) @map("nombre_evaluations")
+  parametresAgenda        Json?            @map("parametres_agenda")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  valideParAdmin User? @relation("MedecinValidation", fields: [valideParAdminId], references: [id])
+
+  @@index([userId])
+  @@index([statutValidation])
+  @@index([noteMoyenne])
+  @@map("medecins")
+  Disponibilite Disponibilite[]
+  MedecinHasSpecialite MedecinHasSpecialite[]
+  MedecinClinique MedecinClinique[]
+  MedecinValidation MedecinValidation[]
+  RendezVous RendezVous[]
+  Ordonnance Ordonnance[]
+  abonnements Abonnement[]
+  
+}
+
+model LogActivite {
+  id            BigInt      @id @default(autoincrement())
+  userId        Int?        @map("user_id")
+  apiKeyId      Int?        @map("api_key_id")
+  action        String      @db.VarChar(100)
+  entiteType    String?     @db.VarChar(50) @map("entite_type")
+  entiteId      Int?        @map("entite_id")
+  details       Json?
+  ipAddress     String?     @db.VarChar(45) @map("ip_address")
+  userAgent     String?     @db.Text @map("user_agent")
+  resultat      Resultat    @default(SUCCES)
+  messageErreur String?     @db.Text @map("message_erreur")
+  dureeMs       Int?        @map("duree_ms")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  user   User?   @relation(fields: [userId], references: [id])
+  apiKey ApiKey? @relation(fields: [apiKeyId], references: [id])
+
+  @@index([userId])
+  @@index([apiKeyId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([entiteType, entiteId])
+  @@map("logs_activite")
+}
+
+// ============================================================================
+// NOUVEAUX ENUMS POUR LE BLOC 2
+// ============================================================================
+
+enum TypeToken {
+  ACCESS
+  REFRESH
+  RESET_PASSWORD
+  EMAIL_VERIFICATION
+}
+
+enum Sexe {
+  M
+  F
+  AUTRE
+}
+
+enum StatutValidation {
+  EN_ATTENTE
+  VALIDE
+  REJETE
+}
+
+enum Resultat {
+  SUCCES
+  ECHEC
+}
+
+// ============================================================================
+// BLOC 3 : TABLES DE VALIDATION ET RELATIONS MÉDECINS
+// ============================================================================
+
+model MedecinValidation {
+  id                 Int            @id @default(autoincrement())
+  medecinId          Int            @map("medecin_id")
+  adminId            Int            @map("admin_id")
+  action             ActionValidation
+  motif              String?        @db.Text
+  documentsVerifies  Json?          @map("documents_verifies")
+  dateAction         DateTime       @default(now()) @map("date_action")
+
+  // Relations
+  medecin Medecin @relation(fields: [medecinId], references: [id])
+  admin   User    @relation("AdminValidation", fields: [adminId], references: [id])
+
+  @@index([medecinId])
+  @@index([dateAction])
+  @@map("medecin_validations")
+}
+
+model MedecinHasSpecialite {
+  medecinId     Int     @map("medecin_id")
+  specialiteId  Int     @map("specialite_id")
+  estPrincipale Boolean @default(false) @map("est_principale")
+
+  // Relations
+  medecin    Medecin           @relation(fields: [medecinId], references: [id], onDelete: Cascade)
+  specialite MedecinSpecialite @relation(fields: [specialiteId], references: [id])
+
+  @@id([medecinId, specialiteId])
+  @@map("medecin_has_specialites")
+}
+
+model MedecinClinique {
+  medecinId           Int  @map("medecin_id")
+  cliniqueId          Int  @map("clinique_id")
+  joursPresence       Json? @map("jours_presence")
+  horairesSpecifiques Json? @map("horaires_specifiques")
+
+  // Relations
+  medecin  Medecin  @relation(fields: [medecinId], references: [id], onDelete: Cascade)
+  clinique Clinique @relation(fields: [cliniqueId], references: [id])
+
+  @@id([medecinId, cliniqueId])
+  @@map("medecin_cliniques")
+}
+
+model Disponibilite {
+  id                   Int              @id @default(autoincrement())
+  medecinId            Int              @map("medecin_id")
+  jourSemaine          JourSemaine?     @map("jour_semaine")
+  heureDebut           String           @map("heure_debut")
+  heureFin             String           @map("heure_fin")
+  typeConsultation     TypeConsultation @map("type_consultation")
+  cliniqueId           Int?             @map("clinique_id")
+  dureeCreneauMinutes  Int              @default(30) @map("duree_creneau_minutes")
+  recurrent            Boolean          @default(true)
+  dateSpecifique       DateTime?        @map("date_specifique") @db.Date
+  bloque               Boolean          @default(false)
+  motifBlocage         String?          @db.VarChar(255) @map("motif_blocage")
+
+  // Relations
+  medecin  Medecin   @relation(fields: [medecinId], references: [id], onDelete: Cascade)
+  clinique Clinique? @relation(fields: [cliniqueId], references: [id])
+
+  @@index([medecinId])
+  @@index([jourSemaine])
+  @@index([dateSpecifique])
+  @@map("disponibilites")
+  RendezVous RendezVous[]
+}
+
+// ============================================================================
+// NOUVEAUX ENUMS POUR LE BLOC 3
+// ============================================================================
+
+enum ActionValidation {
+  VALIDATION
+  REJET
+  SUSPENSION
+}
+
+enum JourSemaine {
+  LUNDI
+  MARDI
+  MERCREDI
+  JEUDI
+  VENDREDI
+  SAMEDI
+  DIMANCHE
+}
+
+enum TypeConsultation {
+  DOMICILE
+  CLINIQUE
+  TELECONSULTATION
+}
+
+// ============================================================================
+// BLOC 4 : SYSTÈME DE RENDEZ-VOUS
+// ============================================================================
+
+model RendezVous {
+  id                      Int              @id @default(autoincrement())
+  patientId               Int              @map("patient_id")
+  medecinId               Int              @map("medecin_id")
+  disponibiliteId         Int?             @map("disponibilite_id")
+  statut                  StatutRendezVous @default(DEMANDE)
+  typeConsultation        TypeConsultation @map("type_consultation")
+  cliniqueId              Int?             @map("clinique_id")
+  dateRendezVous          DateTime         @map("date_rendez_vous") @db.Date
+  heureDebut              String           @map("heure_debut")
+  heureFin                String           @map("heure_fin")
+  motifConsultation       String           @db.Text @map("motif_consultation")
+  symptomes               String?          @db.Text
+  niveauUrgence           NiveauUrgence    @default(NORMAL) @map("niveau_urgence")
+  creneauxProposesPatient Json?            @map("creneaux_proposes_patient")
+  adresseConsultation     String?          @db.Text @map("adresse_consultation")
+  latitudeDomicile        Decimal?         @db.Decimal(10, 8) @map("latitude_domicile")
+  longitudeDomicile       Decimal?         @db.Decimal(11, 8) @map("longitude_domicile")
+  tarif                   Decimal?         @db.Decimal(10, 2)
+  instructionsPreparation String?          @db.Text @map("instructions_preparation")
+  notesMedecin            String?          @db.Text @map("notes_medecin")
+  createdAt               DateTime         @default(now()) @map("created_at")
+  updatedAt               DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  medecin       Medecin        @relation(fields: [medecinId], references: [id])
+  disponibilite Disponibilite? @relation(fields: [disponibiliteId], references: [id])
+  clinique      Clinique?      @relation(fields: [cliniqueId], references: [id])
+
+  @@index([patientId])
+  @@index([medecinId])
+  @@index([dateRendezVous])
+  @@index([statut])
+  @@map("rendez_vous")
+  RendezVousHistorique RendezVousHistorique[]
+  Consultation Consultation[]
+  Evaluation Evaluation[] @relation("EvaluationRendezVous")
+}
+
+model RendezVousHistorique {
+  id                 Int              @id @default(autoincrement())
+  rendezVousId       Int              @map("rendez_vous_id")
+  statutPrecedent    StatutRendezVous? @map("statut_precedent")
+  nouveauStatut      StatutRendezVous? @map("nouveau_statut")
+  modifieParUserId   Int              @map("modifie_par_user_id")
+  motifModification  String?          @db.Text @map("motif_modification")
+  dateModification   DateTime         @default(now()) @map("date_modification")
+  anciennesDonnees   Json?            @map("anciennes_donnees")
+
+  // Relations
+  rendezVous      RendezVous @relation(fields: [rendezVousId], references: [id])
+  modifieParUser  User       @relation("RendezVousModification", fields: [modifieParUserId], references: [id])
+
+  @@index([rendezVousId])
+  @@index([dateModification])
+  @@map("rendez_vous_historique")
+}
+
+// ============================================================================
+// NOUVEAUX ENUMS POUR LE BLOC 4
+// ============================================================================
+
+enum StatutRendezVous {
+  DEMANDE
+  EN_ATTENTE
+  CONFIRME
+  REFUSE
+  ANNULE
+  TERMINE
+}
+
+enum NiveauUrgence {
+  URGENT
+  NORMAL
+  SUIVI_ROUTINE
+}
+
+// ============================================================================
+// BLOC 5 : CONSULTATIONS ET SOINS
+// ============================================================================
+
+model Consultation {
+  id                        Int      @id @default(autoincrement())
+  rendezVousId              Int      @unique @map("rendez_vous_id")
+  dateConsultation          DateTime @map("date_consultation")
+  dureeMinutes              Int?     @map("duree_minutes")
+  diagnostic                String?  @db.Text // Chiffré
+  notesConsultation         String?  @db.Text @map("notes_consultation") // Chiffré
+  examensEffectues          String?  @db.Text @map("examens_effectues") // Chiffré
+  examensPrescrits          String?  @db.Text @map("examens_prescrits") // Chiffré
+  suiviNecessaire           Boolean  @default(false) @map("suivi_necessaire")
+  prochaineConsultationPrevue DateTime? @map("prochaine_consultation_prevue") @db.Date
+  documentsJoints           Json?    @map("documents_joints") // URLs des documents
+  createdAt                 DateTime @default(now()) @map("created_at")
+
+  // Relations
+  rendezVous RendezVous @relation(fields: [rendezVousId], references: [id])
+
+  @@index([dateConsultation])
+  @@map("consultations")
+  Ordonnance Ordonnance[]
+}
+
+model Ordonnance {
+  id                   Int      @id @default(autoincrement())
+  consultationId       Int      @map("consultation_id")
+  medecinId            Int      @map("medecin_id")
+  patientId            Int      @map("patient_id")
+  contenuOrdonnance    String   @db.Text @map("contenu_ordonnance") // Chiffré
+  medicaments          Json?    // Chiffré
+  posologie            Json?    // Chiffré
+  dureeTraitement      Json?    @map("duree_traitement")
+  instructionsSpeciales String? @db.Text @map("instructions_speciales")
+  dateCreation         DateTime @default(now()) @map("date_creation")
+  dateExpiration       DateTime? @map("date_expiration") @db.Date
+  numeroOrdonnance     String   @unique @db.VarChar(50) @map("numero_ordonnance")
+  signatureNumerique   String?  @db.Text @map("signature_numerique") // Hash de l'ordonnance
+  archivee             Boolean  @default(false)
+
+  // Relations
+  consultation Consultation @relation(fields: [consultationId], references: [id])
+  medecin      Medecin      @relation(fields: [medecinId], references: [id])
+  patient      Patient      @relation(fields: [patientId], references: [id])
+
+  @@index([patientId])
+  @@index([medecinId])
+  @@index([numeroOrdonnance])
+  @@map("ordonnances")
+}
+
+// ============================================================================
+// BLOC 6 : ÉVALUATIONS ET SUPPORT
+// ============================================================================
+
+model Evaluation {
+  id               Int            @id @default(autoincrement())
+  evaluateurUserId Int            @map("evaluateur_user_id")
+  evalueUserId     Int            @map("evalue_user_id")
+  rendezVousId     Int            @map("rendez_vous_id")
+  typeEvaluation   TypeEvaluation @map("type_evaluation")
+  note             Int            // CHECK (note >= 1 AND note <= 5)
+  commentaire      String?        @db.Text
+  aspectsEvalues   Json?          @map("aspects_evalues") // {ponctualite: 5, professionnalisme: 4, etc.}
+  visible          Boolean        @default(true)
+  signale          Boolean        @default(false)
+  dateEvaluation   DateTime       @default(now()) @map("date_evaluation")
+
+  // Relations - CORRIGÉES
+  evaluateur User       @relation("EvaluateurRelation", fields: [evaluateurUserId], references: [id])
+  evalue     User       @relation("EvalueRelation", fields: [evalueUserId], references: [id])
+  rendezVous RendezVous @relation("EvaluationRendezVous", fields: [rendezVousId], references: [id])
+
+  @@unique([evaluateurUserId, rendezVousId], name: "unique_evaluation")
+  @@index([evalueUserId])
+  @@index([dateEvaluation])
+  @@map("evaluations")
+}
+
+model TicketSupport {
+  id                   Int             @id @default(autoincrement())
+  userId               Int             @map("user_id")
+  categorie            CategorieTicket
+  priorite             PrioriteTicket  @default(NORMALE)
+  sujet                String          @db.VarChar(255)
+  description          String          @db.Text
+  statut               StatutTicket    @default(OUVERT)
+  assigneAAdminId      Int?            @map("assigne_a_admin_id")
+  resolution           String?         @db.Text
+  dateResolution       DateTime?       @map("date_resolution")
+  satisfactionClient   Int?            @map("satisfaction_client") // CHECK (satisfaction_client >= 1 AND satisfaction_client <= 5)
+  piecesJointes        Json?           @map("pieces_jointes")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  user            User  @relation("TicketUser", fields: [userId], references: [id])
+  assigneAAdmin   User? @relation("TicketAdmin", fields: [assigneAAdminId], references: [id])
+
+  @@index([userId])
+  @@index([statut])
+  @@index([priorite])
+  @@map("tickets_support")
+}
+
+model Signalement {
+  id                  Int              @id @default(autoincrement())
+  signaleParUserId    Int              @map("signale_par_user_id")
+  entiteSignaleeType  EntiteSignalee   @map("entite_signalee_type")
+  entiteSignaleeId    Int              @map("entite_signalee_id")
+  motif               MotifSignalement
+  description         String           @db.Text
+  statut              StatutSignalement @default(EN_ATTENTE)
+  traiteParAdminId    Int?             @map("traite_par_admin_id")
+  actionPrise         String?          @db.Text @map("action_prise")
+  dateTraitement      DateTime?        @map("date_traitement")
+  createdAt           DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  signaleParUser   User  @relation("SignalementUser", fields: [signaleParUserId], references: [id])
+  traiteParAdmin   User? @relation("SignalementAdmin", fields: [traiteParAdminId], references: [id])
+
+  @@index([statut])
+  @@index([entiteSignaleeType, entiteSignaleeId])
+  @@map("signalements")
+}
+
+// ============================================================================
+// NOUVEAUX ENUMS POUR LE BLOC 6
+// ============================================================================
+
+enum TypeEvaluation {
+  PATIENT_EVALUE_MEDECIN
+  MEDECIN_EVALUE_PATIENT
+}
+
+enum CategorieTicket {
+  BUG
+  QUESTION
+  LITIGE
+  SUGGESTION
+  AUTRE
+}
+
+enum PrioriteTicket {
+  BASSE
+  NORMALE
+  HAUTE
+  CRITIQUE
+}
+
+enum StatutTicket {
+  OUVERT
+  EN_COURS
+  EN_ATTENTE
+  RESOLU
+  FERME
+}
+
+enum EntiteSignalee {
+  USER
+  EVALUATION
+  ORDONNANCE
+  CONSULTATION
+}
+
+enum MotifSignalement {
+  CONTENU_INAPPROPRIE
+  FAUX_PROFIL
+  COMPORTEMENT_ABUSIF
+  SPAM
+  AUTRE
+}
+
+enum StatutSignalement {
+  EN_ATTENTE
+  EN_COURS
+  VALIDE
+  REJETE
+}
+
+// ============================================================================
+// BLOC 7 : GESTION FINANCIÈRE
+// ============================================================================
+
+model Abonnement {
+  id                        Int            @id @default(autoincrement())
+  medecinId                 Int            @map("medecin_id")
+  typeAbonnement            TypeAbonnement @default(PAR_RENDEZ_VOUS) @map("type_abonnement")
+  dateDebut                 DateTime       @map("date_debut") @db.Date
+  dateFin                   DateTime?      @map("date_fin") @db.Date
+  tarifParRendezVous        Decimal?       @db.Decimal(10, 2) @map("tarif_par_rendez_vous")
+  nombreRendezVousInclus    Int?           @map("nombre_rendez_vous_inclus")
+  nombreRendezVousUtilises  Int            @default(0) @map("nombre_rendez_vous_utilises")
+  statut                    StatutAbonnement @default(ACTIF)
+  renouvellementAuto        Boolean        @default(true) @map("renouvellement_auto")
+  createdAt                 DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  medecin Medecin @relation(fields: [medecinId], references: [id])
+  factures Facture[]
+
+  @@index([medecinId])
+  @@index([statut])
+  @@map("abonnements")
+}
+
+model Facture {
+  id                Int           @id @default(autoincrement())
+  abonnementId      Int           @map("abonnement_id")
+  numeroFacture     String        @unique @db.VarChar(50) @map("numero_facture")
+  dateFacture       DateTime      @map("date_facture") @db.Date
+  dateEcheance      DateTime      @map("date_echeance") @db.Date
+  montantHt         Decimal       @db.Decimal(10, 2) @map("montant_ht")
+  tauxTva           Decimal       @default(18.00) @db.Decimal(5, 2) @map("taux_tva")
+  montantTva        Decimal       @db.Decimal(10, 2) @map("montant_tva")
+  montantTtc        Decimal       @db.Decimal(10, 2) @map("montant_ttc")
+  statut            StatutFacture @default(BROUILLON)
+  detailsLignes     Json?         @map("details_lignes")
+  datePaiement      DateTime?     @map("date_paiement") @db.Date
+  modePaiement      String?       @db.VarChar(50) @map("mode_paiement")
+  referencePaiement String?       @db.VarChar(100) @map("reference_paiement")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  abonnement Abonnement @relation(fields: [abonnementId], references: [id])
+  paiements Paiement[]
+
+  @@index([numeroFacture])
+  @@index([statut])
+  @@map("factures")
+}
+
+model Paiement {
+  id                   Int          @id @default(autoincrement())
+  factureId            Int          @map("facture_id")
+  montant              Decimal      @db.Decimal(10, 2)
+  modePaiement         ModePaiement @map("mode_paiement")
+  statut               StatutPaiement @default(EN_ATTENTE)
+  referenceTransaction String?      @unique @db.VarChar(100) @map("reference_transaction")
+  donneesTransaction   Json?        @map("donnees_transaction") // Chiffré
+  datePaiement         DateTime     @default(now()) @map("date_paiement")
+  dateValidation       DateTime?    @map("date_validation")
+  motifEchec           String?      @db.Text @map("motif_echec")
+
+  // Relations
+  facture Facture @relation(fields: [factureId], references: [id])
+
+  @@index([referenceTransaction])
+  @@index([statut])
+  @@map("paiements")
+}
+
+// ============================================================================
+// NOUVEAUX ENUMS POUR LE BLOC 7
+// ============================================================================
+
+enum TypeAbonnement {
+  PAR_RENDEZ_VOUS
+  MENSUEL
+  ANNUEL
+}
+
+enum StatutAbonnement {
+  ACTIF
+  SUSPENDU
+  EXPIRE
+}
+
+enum StatutFacture {
+  BROUILLON
+  EMISE
+  PAYEE
+  ANNULEE
+}
+
+enum ModePaiement {
+  CARTE_BANCAIRE
+  MOBILE_MONEY
+  VIREMENT
+}
+
+enum StatutPaiement {
+  EN_ATTENTE
+  VALIDE
+  REFUSE
+  REMBOURSE
+}
+
+// ============================================================================
+// BLOC 8 : COMMUNICATION ET NOTIFICATIONS
+// ============================================================================
+
+model Notification {
+  id                      Int                @id @default(autoincrement())
+  userId                  Int                @map("user_id")
+  typeNotification        TypeNotification   @map("type_notification")
+  titre                   String             @db.VarChar(255)
+  message                 String             @db.Text
+  canal                   CanalNotification
+  statut                  StatutNotification @default(EN_ATTENTE)
+  priorite                PrioriteNotification @default(NORMALE)
+  donneesSupplementaires  Json?              @map("donnees_supplementaires")
+  dateEnvoiPrevue         DateTime?          @map("date_envoi_prevue")
+  dateEnvoiReel           DateTime?          @map("date_envoi_reel")
+  dateLecture             DateTime?          @map("date_lecture")
+  tentativesEnvoi         Int                @default(0) @map("tentatives_envoi")
+  createdAt               DateTime           @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation("NotificationUser", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([statut])
+  @@index([dateEnvoiPrevue])
+  @@map("notifications")
+}
+
+model Annonce {
+  id                   Int           @id @default(autoincrement())
+  titre                String        @db.VarChar(255)
+  contenu              String        @db.Text
+  typeAnnonce          TypeAnnonce   @map("type_annonce")
+  cible                CibleAnnonce  @default(TOUS)
+  priorite             PrioriteAnnonce @default(NORMALE)
+  dateDebutAffichage   DateTime      @map("date_debut_affichage")
+  dateFinAffichage     DateTime?     @map("date_fin_affichage")
+  active               Boolean       @default(true)
+  creeParAdminId       Int           @map("cree_par_admin_id")
+  createdAt            DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  creeParAdmin User @relation("AnnonceAdmin", fields: [creeParAdminId], references: [id])
+
+  @@index([active])
+  @@index([dateDebutAffichage, dateFinAffichage])
+  @@map("annonces")
+}
+
+// ============================================================================
+// NOUVEAUX ENUMS POUR LE BLOC 8
+// ============================================================================
+
+enum TypeNotification {
+  RENDEZ_VOUS
+  VALIDATION_COMPTE
+  PAIEMENT
+  RAPPEL
+  SYSTEME
+}
+
+enum CanalNotification {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum StatutNotification {
+  EN_ATTENTE
+  ENVOYE
+  LU
+  ECHEC
+}
+
+enum PrioriteNotification {
+  BASSE
+  NORMALE
+  HAUTE
+}
+
+enum TypeAnnonce {
+  MAINTENANCE
+  NOUVELLE_FONCTIONNALITE
+  INFORMATION
+  ALERTE
+}
+
+enum CibleAnnonce {
+  TOUS
+  PATIENTS
+  MEDECINS
+  ADMINS
+}
+
+enum PrioriteAnnonce {
+  BASSE
+  NORMALE
+  HAUTE
+}
+
+// ============================================================================
+// BLOC 9 : SERVICES D'URGENCE ET IA (DERNIER BLOC)
+// ============================================================================
+
+model PharmacieGarde {
+  id              Int      @id @default(autoincrement())
+  nom             String   @db.VarChar(200)
+  adresse         String   @db.Text
+  quartier        String?  @db.VarChar(100)
+  ville           String   @default("Abidjan") @db.VarChar(100)
+  telephone       String?  @db.VarChar(20)
+  latitude        Decimal? @db.Decimal(10, 8)
+  longitude       Decimal? @db.Decimal(11, 8)
+  dateGarde       DateTime @map("date_garde") @db.Date
+  heureOuverture  String?  @map("heure_ouverture")
+  heureFermeture  String?  @map("heure_fermeture")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([dateGarde])
+  @@index([ville])
+  @@index([quartier])
+  @@map("pharmacies_garde")
+}
+
+model CentreUrgence {
+  id                Int         @id @default(autoincrement())
+  nom               String      @db.VarChar(200)
+  typeCentre        TypeCentre  @map("type_centre")
+  adresse           String      @db.Text
+  ville             String      @default("Abidjan") @db.VarChar(100)
+  telephone         String      @db.VarChar(20)
+  telephoneUrgence  String?     @db.VarChar(20) @map("telephone_urgence")
+  latitude          Decimal?    @db.Decimal(10, 8)
+  longitude         Decimal?    @db.Decimal(11, 8)
+  specialites       Json?
+  horairesUrgence   String      @default("24/7") @db.VarChar(100) @map("horaires_urgence")
+  active            Boolean     @default(true)
+
+  @@index([ville])
+  @@index([typeCentre])
+  @@map("centres_urgence")
+}
+
+model ContenuProConversation {
+  id          Int      @id @default(autoincrement())
+  patientId   Int      @map("patient_id")
+  sessionId   String   @db.VarChar(100) @map("session_id")
+  question    String   @db.Text
+  reponse     String   @db.Text
+  contexte    Json?
+  satisfaction Int?    // CHECK (satisfaction >= 1 AND satisfaction <= 5)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([patientId])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("contenu_pro_conversations")
+}
+
+// ============================================================================
+// NOUVEAUX ENUMS POUR LE BLOC 9
+// ============================================================================
+
+enum TypeCentre {
+  HOPITAL
+  CLINIQUE_URGENCE
+  SAMU
+}
