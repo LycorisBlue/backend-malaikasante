@@ -8,7 +8,7 @@ paths:
   /v1/auth/otp/send:
     post:
       tags:
-        - Authentification OTP
+        - Authentification
       summary: Envoyer un code OTP par SMS
       description: |
         Génère un code de vérification à 4 chiffres et l'envoie par SMS au numéro fourni.
@@ -278,9 +278,3 @@ paths:
                     timestamp: "2024-01-15T14:30:22.123Z"
 
       security: []  # Endpoint public, pas d'authentification requise
-
-
-tags:
-  - name: Authentification OTP
-    description: |
-      Gestion des codes de vérification OTP (One-Time Password)

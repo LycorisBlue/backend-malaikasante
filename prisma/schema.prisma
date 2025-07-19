@@ -144,6 +144,7 @@ model User {
  telephone                 String   @unique @db.VarChar(20)
  nom                       String   @db.VarChar(100)
  prenom                    String   @db.VarChar(100)
+ password                  String?  @db.VarChar(255)
  role                      Role
  statut                    StatutUser @default(ACTIF)
  canalCommunicationPrefere Canal    @default(EMAIL) @map("canal_communication_prefere")
