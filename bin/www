@@ -1,48 +1,45 @@
 #!/usr/bin/env node
 
 /**
- * Module dependencies.
+ * Serveur HTTP avec gestion multi-environnement
  */
 
-var app = require('../app');
-var debug = require('debug')('backend:server');
-var http = require('http');
+const app = require('../app');
+const debug = require('debug')('medecins-patients:server');
+const http = require('http');
+const Consts = require('../config/const');
 
 /**
- * Get port from environment and store in Express.
+ * Obtenir le port selon l'environnement
  */
-
-var port = normalizePort(process.env.PORT || '3000');
+const port = normalizePort(Consts.getPort());
 app.set('port', port);
 
 /**
- * Create HTTP server.
+ * Créer le serveur HTTP
  */
-
-var server = http.createServer(app);
+const server = http.createServer(app);
 
 /**
- * Listen on provided port, on all network interfaces.
+ * Écouter sur le port configuré
  */
-
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
 
 /**
- * Normalize a port into a number, string, or false.
+ * Normaliser le port en nombre, string, ou false
  */
-
 function normalizePort(val) {
-  var port = parseInt(val, 10);
+  const port = parseInt(val, 10);
 
   if (isNaN(port)) {
-    // named pipe
+    // Named pipe
     return val;
   }
 
   if (port >= 0) {
-    // port number
+    // Port number
     return port;
   }
 
@@ -50,26 +47,25 @@ function normalizePort(val) {
 }
 
 /**
- * Event listener for HTTP server "error" event.
+ * Gestionnaire d'erreurs du serveur HTTP
  */
-
 function onError(error) {
   if (error.syscall !== 'listen') {
     throw error;
   }
 
-  var bind = typeof port === 'string'
+  const bind = typeof port === 'string'
     ? 'Pipe ' + port
     : 'Port ' + port;
 
-  // handle specific listen errors with friendly messages
+  // Gestion des erreurs spécifiques
   switch (error.code) {
     case 'EACCES':
-      console.error(bind + ' requires elevated privileges');
+      console.error(`❌ ${bind} nécessite des privilèges élevés`);
       process.exit(1);
       break;
     case 'EADDRINUSE':
-      console.error(bind + ' is already in use');
+      console.error(`❌ ${bind} est déjà utilisé`);
       process.exit(1);
       break;
     default:
@@ -78,13 +74,43 @@ function onError(error) {
 }
 
 /**
- * Event listener for HTTP server "listening" event.
+ * Gestionnaire d'événement "listening" du serveur HTTP
  */
-
 function onListening() {
-  var addr = server.address();
-  var bind = typeof addr === 'string'
+  const addr = server.address();
+  const bind = typeof addr === 'string'
     ? 'pipe ' + addr
     : 'port ' + addr.port;
+
+  const env = process.env.NODE_ENV || 'development';
+
+  console.log('\n🚀 ===== SERVEUR DÉMARRÉ =====');
+  console.log(`📍 URL: http://localhost:${addr.port}`);
+  console.log(`🌍 Environnement: ${env}`);
+  console.log(`⚡ App: ${Consts.APP_NAME}`);
+  console.log(`👤 Auteur: ${Consts.APP_AUTHOR}`);
+  console.log('📚 Documentation: http://localhost:' + addr.port + '/v1/api-docs');
+  console.log('🔍 Test API: http://localhost:' + addr.port + '/v1/info');
+  console.log('================================\n');
+
   debug('Listening on ' + bind);
 }
+
+/**
+ * Gestion propre de l'arrêt du serveur
+ */
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Arrêt du serveur en cours...');
+  server.close(() => {
+    console.log('✅ Serveur arrêté proprement');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('\n🛑 Arrêt du serveur (Ctrl+C)...');
+  server.close(() => {
+    console.log('✅ Serveur arrêté proprement');
+    process.exit(0);
+  });
+});
