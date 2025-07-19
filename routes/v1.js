@@ -5,8 +5,8 @@ const router = express.Router();
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('../config/swagger');
 
-// TODO: Import des contrôleurs (à créer dans les prochaines étapes)
-// const authController = require('../controllers/AuthController');
+const authController = require('../controllers/AuthController');
+
 // const patientController = require('../controllers/PatientController');
 // const medecinController = require('../controllers/MedecinController');
 
@@ -66,5 +66,8 @@ router.get('/api-docs', swaggerUi.setup(swaggerSpec, {
         showRequestHeaders: true
     }
 }));
+
+// Ajout du contrôleur d'authentification
+router.use('/auth', authController);
 
 module.exports = router;

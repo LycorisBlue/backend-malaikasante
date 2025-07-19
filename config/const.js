@@ -31,7 +31,7 @@ class Consts {
     static SMS_CONFIG = {
         baseUrl: process.env.LETEXTO_API_URL,
         apiKey: process.env.LETEXTO_API_KEY,
-        sender: 'MEDECINS',
+        sender: 'REXTO',
         countryCode: '225' // Côte d'Ivoire
     };
 
