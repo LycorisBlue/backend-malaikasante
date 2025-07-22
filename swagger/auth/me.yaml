@@ -8,22 +8,10 @@ paths:
   /v1/auth/me:
     get:
       tags:
-        - Informations Utilisateur
+        - Authentification
       summary: Récupérer les informations de l'utilisateur connecté
       description: |
         Retourne toutes les informations détaillées de l'utilisateur authentifié.
-        
-        **Informations retournées selon le rôle :**
-        - **Patient** : Données personnelles + profil médical complet
-        - **Médecin** : Données professionnelles + clinique + validation
-        - **Admin** : Données de base administrateur
-        
-        **Fonctionnalités :**
-        - Calcul automatique de l'âge (patients)
-        - Calcul de l'IMC (patients avec poids/taille)
-        - Pourcentage de completion du profil
-        - Statut de validation (médecins)
-
       security:
         - bearerAuth: []
 
@@ -433,7 +421,3 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
-tags:
-  - name: Informations Utilisateur
-    description: |
-      Récupération des informations détaillées de l'utilisateur connecté
