@@ -1,69 +1,125 @@
-# Guide Architecture Backend - Plateforme Médecins-Patients
-## 🎯 Comprendre et Maîtriser la Structure
+# 🏥 Plateforme de Mise en Relation Médecins-Patients
+
+API backend pour la mise en relation médecins-patients en Côte d'Ivoire, développée par **LYCORIS GROUP**.
+
+[![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4.21.2-blue.svg)](https://expressjs.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-6.12.0-indigo.svg)](https://www.prisma.io/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg)](https://www.mysql.com/)
+
+## 📋 Table des Matières
+
+- [🏗️ Architecture du Projet](#️-architecture-du-projet)
+- [📁 Structure des Dossiers](#-structure-des-dossiers)
+- [⚙️ Configuration](#️-configuration)
+- [🛡️ Middleware](#️-middleware)
+- [🔄 Workflow de Développement](#-workflow-de-développement)
+- [📊 Phases de Développement](#-phases-de-développement)
+- [🚀 Guide de Démarrage](#-guide-de-démarrage)
+- [📖 Documentation API](#-documentation-api)
+- [🧪 Tests](#-tests)
+- [🔧 Déploiement](#-déploiement)
 
 ---
 
-## 📁 Rôle de Chaque Dossier
+## 🏗️ Architecture du Projet
 
-### **`app.js`** - Point d'entrée Express
-**Rôle** : Configuration principale du serveur Express
-```javascript
-const express = require('express');
-const cookieParser = require('cookie-parser');
-const logger = require('morgan');
+### Stack Technique
+- **Backend** : Node.js + Express.js
+- **Base de données** : MySQL + Prisma ORM
+- **Authentification** : JWT + OTP (SMS via LeTexto)
+- **Documentation** : Swagger/OpenAPI
+- **Validation** : Express-validator + Middleware custom
+- **Chiffrement** : bcrypt + AES-256 pour données sensibles
 
-const v1Router = require('./routes/v1');
-const app = express();
-
-// Middleware globaux
-app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-
-// Routes principales
-app.use('/v1', v1Router);
-
-module.exports = app;
-```
-
-### **`bin/www`** - Serveur HTTP
-**Rôle** : Démarrage du serveur avec gestion des environnements
-```javascript
-#!/usr/bin/env node
-var app = require('../app');
-var http = require('http');
-
-// Port selon environnement
-const portMap = {
-  development: 3000,
-  test: 3001, 
-  production: 8080
-};
-
-const port = portMap[process.env.NODE_ENV] || 3000;
-app.set('port', port);
-
-var server = http.createServer(app);
-server.listen(port);
-console.log(`🚀 Serveur démarré sur le port ${port}`);
-```
+### Principes Architecturaux
+- **Séparation des responsabilités** : Controllers → Services → Prisma
+- **Validation en couches** : BodyFilter → Business Logic → Database
+- **Sécurité by design** : Authentification + autorisation granulaire
+- **API RESTful** : Standards HTTP + codes de statut appropriés
 
 ---
 
-## 📂 **`config/`** - Configuration Centralisée
+## 📁 Structure des Dossiers
 
-### **`config/const.js`** - Constantes globales
-**Rôle** : Toutes les configurations en un seul endroit
+```
+medecins-patients-backend/
+├── 📁 bin/                     # Point d'entrée serveur
+│   └── www                     # Serveur HTTP avec gestion multi-env
+├── 📁 config/                  # Configuration centralisée
+│   ├── const.js               # Constantes globales (JWT, SMS, OTP)
+│   └── swagger.js             # Configuration documentation API
+├── 📁 controllers/            # Logique métier et orchestration
+│   └── AuthController.js      # Routage des endpoints d'auth
+├── 📁 middleware/             # Couches de validation et sécurité
+│   ├── authMiddleware.js      # Authentification + autorisation
+│   └── bodyFilterMiddleware.js # Validation et nettoyage données
+├── 📁 prisma/                 # ORM et base de données
+│   ├── client.js              # Instance Prisma configurée
+│   ├── schema.prisma          # Modèle de données complet
+│   └── migrations/            # Évolutions de schéma
+├── 📁 routes/                 # Endpoints spécialisés
+│   ├── v1.js                  # Router principal API v1
+│   └── auth/                  # Routes d'authentification
+│       ├── otp-send.js        # Génération et envoi OTP
+│       ├── otp-verify.js      # Vérification OTP + connexion
+│       ├── register-patient.js # Inscription patients (SANS password)
+│       ├── register-medecin.js # Inscription médecins (AVEC password)
+│       ├── login.js           # Connexion email/password (médecins/admins)
+│       └── me.js              # Informations utilisateur connecté
+├── 📁 services/               # Services métier et utilitaires
+│   ├── ApiResponse.js         # Réponses HTTP standardisées
+│   ├── TokenService.js        # Gestion JWT (génération/vérification)
+│   └── SmsService.js          # Envoi SMS via API LeTexto
+├── 📁 swagger/                # Documentation OpenAPI
+│   ├── info/                  # Endpoints système
+│   └── auth/                  # Documentation authentification
+├── 📁 test/                   # Scripts de test et validation
+├── 📁 public/                 # Assets statiques
+├── app.js                     # Configuration Express principale
+├── package.json               # Dépendances et scripts npm
+└── .env                       # Variables d'environnement
+```
+
+### Rôle de Chaque Dossier
+
+#### 📁 `bin/` - Serveur HTTP
+- **`www`** : Point d'entrée avec gestion des ports par environnement
+- **Responsabilité** : Démarrage serveur, gestion erreurs réseau, logs de démarrage
+
+#### 📁 `config/` - Configuration Centralisée
+- **Responsabilité** : Toutes les configurations applicatives en un seul endroit
+- **Avantage** : Facilite la maintenance et les changements d'environnement
+
+#### 📁 `controllers/` - Orchestration Métier
+- **Responsabilité** : Assemblage des routes par domaine fonctionnel
+- **Pattern** : Un controller = un domaine métier (Auth, Patient, Médecin, Admin)
+
+#### 📁 `middleware/` - Couches Transversales
+- **Responsabilité** : Validation, sécurité, transformation des données
+- **Exécution** : Avant les controllers dans la chaîne Express
+
+#### 📁 `routes/` - Endpoints Spécialisés
+- **Responsabilité** : Logique métier spécifique de chaque endpoint
+- **Pattern** : Organisation hiérarchique par fonctionnalité
+
+#### 📁 `services/` - Services Métier
+- **Responsabilité** : Logique réutilisable, intégrations externes
+- **Indépendance** : Pas de dépendance à Express (testabilité)
+
+---
+
+## ⚙️ Configuration
+
+### 📄 `config/const.js` - Constantes Globales
+
 ```javascript
-const dayjs = require('dayjs');
-
 class Consts {
-    // Informations app
+    // 🏷️ Informations application
     static APP_NAME = "Plateforme Médecins-Patients";
-    static APP_AUTHOR = "MEDEV GROUP";
+    static APP_AUTHOR = "LYCORIS GROUP";
     
-    // JWT selon environnement
+    // 🔐 JWT par environnement (sécurité)
     static JWT_SECRET = (() => {
         const env = process.env.NODE_ENV || 'development';
         switch (env) {
@@ -73,552 +129,195 @@ class Consts {
         }
     })();
     
-    // Configuration SMS LeTexto (Côte d'Ivoire)
+    // 📱 Configuration SMS LeTexto (Côte d'Ivoire)
     static SMS_CONFIG = {
         baseUrl: process.env.LETEXTO_API_URL,
         apiKey: process.env.LETEXTO_API_KEY,
-        sender: 'MEDECINS',
+        sender: 'REXTO',
         countryCode: '225'
     };
     
-    // Configuration OTP
+    // 🔢 Configuration OTP
     static OTP_CONFIG = {
-        length: 4,
-        expirationMinutes: 5,
-        maxAttempts: 3
+        length: 4,               // Code à 4 chiffres
+        expirationMinutes: 5,    // Validité 5 minutes
+        maxAttempts: 3           // 3 tentatives max
     };
     
-    static getDateLib() {
-        return dayjs;
-    }
+    // ⏰ Durées tokens JWT par rôle
+    static JWT_EXPIRATION = {
+        PATIENT: { access: '7d', refresh: '30d' },
+        MEDECIN: { access: '1d', refresh: '30d' },
+        ADMIN: { access: '1d', refresh: null }  // Pas de refresh pour admins
+    };
 }
-
-module.exports = Consts;
 ```
 
-### **`config/swagger.js`** - Documentation API
-**Rôle** : Configuration automatique de la documentation Swagger
+**Usage** : `const Consts = require('./config/const');`
+
+### 📄 `config/swagger.js` - Documentation API
+
 ```javascript
 const swaggerJsdoc = require('swagger-jsdoc');
-
-const getServers = () => {
-    const environment = process.env.NODE_ENV || 'development';
-    const servers = [];
-    
-    switch (environment) {
-        case 'production':
-            servers.push({
-                url: 'https://api.medecins-patients.ci',
-                description: 'Serveur de production'
-            });
-            break;
-        default:
-            servers.push({
-                url: 'http://localhost:3000',
-                description: 'Serveur de développement'
-            });
-    }
-    return servers;
-};
 
 const options = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'API Plateforme Médecins-Patients',
+            title: "API Plateforme Médecins-Patients",
             version: '1.0.0',
-            description: 'Documentation API pour la mise en relation médecins-patients'
         },
-        servers: getServers()
+        servers: getServers(), // URLs selon environnement
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT'
+                }
+            }
+        }
     },
-    apis: ['./swagger/**/*.yaml']
+    apis: ['./swagger/**/*.yaml', './routes/**/*.js']
+};
+```
+
+**Accès** : `http://localhost:3000/v1/api-docs`
+
+---
+
+## 🛡️ Middleware
+
+### 🔐 `authMiddleware.js` - Authentification & Autorisation
+
+#### `authenticate()` - Vérification des Tokens JWT
+```javascript
+AuthMiddleware.authenticate()
+```
+- **Rôle** : Valide le token JWT dans l'en-tête Authorization
+- **Ajouts à `req`** : `req.user` (données utilisateur), `req.token`
+- **Erreurs** : 401 si token invalide/expiré, 404 si utilisateur introuvable
+
+#### `authorize(roles)` - Contrôle des Permissions
+```javascript
+AuthMiddleware.authorize(['PATIENT'])           // Un seul rôle
+AuthMiddleware.authorize(['MEDECIN', 'ADMIN'])  // Plusieurs rôles
+```
+- **Rôle** : Vérifie que l'utilisateur a l'un des rôles autorisés
+- **Prérequis** : Doit être utilisé APRÈS `authenticate()`
+
+#### `authorizeValidatedMedecin()` - Médecins Validés Uniquement
+```javascript
+AuthMiddleware.authorizeValidatedMedecin()
+```
+- **Rôle** : Autorise uniquement les médecins avec `statutValidation: 'VALIDE'`
+- **Usage** : Endpoints réservés aux médecins en exercice
+
+**Exemple d'utilisation complète :**
+```javascript
+router.get('/profile',
+    AuthMiddleware.authenticate(),
+    AuthMiddleware.authorize(['PATIENT']),
+    (req, res) => {
+        // req.user contient les données du patient authentifié
+    }
+);
+```
+
+### ✅ `bodyFilterMiddleware.js` - Validation des Données
+
+#### Configuration des Schémas
+```javascript
+const schema = {
+    fields: {
+        email: {
+            type: 'email',
+            maxLength: 255
+        },
+        telephone: {
+            type: 'phone'  // Validation spéciale CI (8-10 chiffres)
+        },
+        nom: {
+            type: 'string',
+            minLength: 2,
+            maxLength: 100
+        },
+        age: {
+            type: 'number',
+            min: 0,
+            max: 120
+        },
+        role: {
+            type: 'string',
+            enum: ['PATIENT', 'MEDECIN', 'ADMIN']
+        }
+    },
+    required: ['email', 'telephone'],  // Champs obligatoires
+    strict: true                       // Rejeter champs non autorisés
 };
 
-module.exports = swaggerJsdoc(options);
+router.post('/', BodyFilter.validate(schema), handler);
 ```
+
+#### Types de Validation Supportés
+- **`string`** : Chaîne avec longueurs min/max
+- **`number`** : Nombre avec valeurs min/max
+- **`email`** : Format email valide
+- **`phone`** : Téléphone ivoirien (8-10 chiffres)
+- **`date`** : Date valide
+- **`boolean`** : Booléen strict
+- **`array`** : Tableau
+- **`object`** : Objet
+- **`enum`** : Valeur dans liste prédéfinie
+
+#### Nettoyage Automatique
+- **Trim** des chaînes
+- **Suppression** caractères non-numériques des téléphones
+- **Conversion** de types si nécessaire
+- **Validation** et transformation en une seule étape
 
 ---
 
-## 🛡️ **`middleware/`** - Couches de Sécurité
+## 🔄 Workflow de Développement
 
-### **`middleware/authMiddleware.js`** - Authentification & Autorisation
-**Rôle** : Vérifier les tokens JWT et gérer les permissions par rôle
+### 📋 Processus Complet : Créer un Endpoint
+
+#### Étape 1 : Définir le Schéma de Validation
 ```javascript
-const TokenService = require('../services/TokenService');
-const ApiResponse = require('../services/ApiResponse');
-const prisma = require('../prisma/client');
-
-class AuthMiddleware {
-    /**
-     * Vérifie que l'utilisateur est authentifié
-     */
-    static authenticate() {
-        return async (req, res, next) => {
-            try {
-                const authHeader = req.headers.authorization;
-                
-                // Vérification présence token
-                if (!authHeader || !authHeader.startsWith('Bearer ')) {
-                    return ApiResponse.unauthorized(res, 'Token d\'authentification requis');
-                }
-                
-                const token = authHeader.substring(7);
-                
-                // Validation token
-                const tokenCheck = TokenService.checkToken(token);
-                if (!tokenCheck.isValid) {
-                    return ApiResponse.unauthorized(res, 'Token invalide');
-                }
-                
-                // Récupération utilisateur
-                const user = await prisma.user.findUnique({
-                    where: { 
-                        id: tokenCheck.payload.userId,
-                        statut: 'ACTIF'
-                    },
-                    include: {
-                        patient: true,
-                        medecin: true
-                    }
-                });
-                
-                if (!user) {
-                    return ApiResponse.unauthorized(res, 'Utilisateur non trouvé');
-                }
-                
-                req.user = user;
-                req.token = token;
-                next();
-                
-            } catch (error) {
-                console.error('Erreur auth:', error);
-                return ApiResponse.serverError(res, 'Erreur d\'authentification');
-            }
-        };
-    }
-    
-    /**
-     * Vérifie les rôles autorisés
-     */
-    static authorize(allowedRoles) {
-        return (req, res, next) => {
-            if (!req.user) {
-                return ApiResponse.unauthorized(res, 'Authentification requise');
-            }
-            
-            const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-            
-            if (!roles.includes(req.user.role)) {
-                return ApiResponse.unauthorized(res, 'Permissions insuffisantes');
-            }
-            
-            next();
-        };
-    }
-}
-
-module.exports = AuthMiddleware;
+// routes/patients/profile.js
+const profileSchema = {
+    fields: {
+        nom: { type: 'string', minLength: 2, maxLength: 100 },
+        prenom: { type: 'string', minLength: 2, maxLength: 100 },
+        dateNaissance: { type: 'date' },
+        sexe: { type: 'string', enum: ['M', 'F', 'AUTRE'] }
+    },
+    required: ['nom', 'prenom'],
+    strict: true
+};
 ```
 
-### **`middleware/bodyFilterMiddleware.js`** - Validation des Données
-**Rôle** : Filtrer et valider les données reçues dans les requêtes
+#### Étape 2 : Créer la Route Spécialisée
 ```javascript
-const ApiResponse = require('../services/ApiResponse');
-
-class BodyFilter {
-    /**
-     * Filtre les champs autorisés et vérifie les champs obligatoires
-     */
-    static filter(schema) {
-        return (req, res, next) => {
-            try {
-                const { required = [], allowed = [], strict = true } = schema;
-                const bodyKeys = Object.keys(req.body || {});
-                
-                // Vérification champs manquants
-                const missingFields = required.filter(field => 
-                    !(field in req.body) || 
-                    req.body[field] === null || 
-                    req.body[field] === undefined || 
-                    req.body[field] === ''
-                );
-                
-                if (missingFields.length > 0) {
-                    return ApiResponse.badRequest(res, 'Champs manquants', {
-                        missingFields,
-                        message: `Champs obligatoires: ${missingFields.join(', ')}`
-                    });
-                }
-                
-                // Vérification champs non autorisés
-                if (strict && allowed.length > 0) {
-                    const unauthorizedFields = bodyKeys.filter(field => !allowed.includes(field));
-                    
-                    if (unauthorizedFields.length > 0) {
-                        return ApiResponse.badRequest(res, 'Champs non autorisés', {
-                            unauthorizedFields,
-                            allowedFields: allowed
-                        });
-                    }
-                }
-                
-                next();
-            } catch (error) {
-                console.error('Erreur bodyFilter:', error);
-                return ApiResponse.serverError(res, 'Erreur de validation');
-            }
-        };
-    }
-}
-
-module.exports = BodyFilter;
-```
-
----
-
-## 🗄️ **`prisma/`** - Base de Données
-
-### **`prisma/client.js`** - Client Prisma
-**Rôle** : Instance Prisma réutilisable dans toute l'app
-```javascript
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn'] : ['warn'],
-});
-
-module.exports = prisma;
-```
-
-### **`prisma/schema.prisma`** - Modèle de Données (extrait)
-**Rôle** : Définition de la structure de base de données
-```prisma
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
-}
-
-enum Role {
-  PATIENT
-  MEDECIN
-  ADMIN
-}
-
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  telephone String   @unique
-  nom       String
-  prenom    String
-  role      Role
-  statut    StatutUser @default(ACTIF)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
-  patient   Patient?
-  medecin   Medecin?
-  tokens    UserToken[]
-  
-  @@map("users")
-}
-
-model Patient {
-  id                  String @id @default(uuid())
-  userId              String @unique
-  dateNaissance       DateTime?
-  allergies           String?  // Données chiffrées
-  antecedentsMedicaux String?  // Données chiffrées
-  
-  user        User         @relation(fields: [userId], references: [id])
-  rendezVous  RendezVous[]
-  
-  @@map("patients")
-}
-```
-
----
-
-## 🔧 **`services/`** - Services Métier
-
-### **`services/ApiResponse.js`** - Réponses Standardisées
-**Rôle** : Uniformiser toutes les réponses HTTP de l'API
-```javascript
-class ApiResponse {
-    static success(res, message, data = null) {
-        return res.status(200).json({ message, data });
-    }
-    
-    static created(res, message, data = null) {
-        return res.status(201).json({ message, data });
-    }
-    
-    static badRequest(res, message, data = null) {
-        return res.status(400).json({ message, data });
-    }
-    
-    static unauthorized(res, message, data = null) {
-        return res.status(401).json({ message, data });
-    }
-    
-    static notFound(res, message, data = null) {
-        return res.status(404).json({ message, data });
-    }
-    
-    static serverError(res, message, data = null) {
-        return res.status(500).json({ message, data });
-    }
-}
-
-module.exports = ApiResponse;
-```
-
-### **`services/TokenService.js`** - Gestion JWT
-**Rôle** : Créer, vérifier et révoquer les tokens d'authentification
-```javascript
-const jwt = require('jsonwebtoken');
-const prisma = require('../prisma/client');
-const Consts = require('../config/const');
-
-class TokenService {
-    /**
-     * Génère un token d'accès selon le rôle
-     */
-    static async generateToken(user) {
-        const payload = { userId: user.id, role: user.role };
-        
-        // Durée selon le rôle
-        let expiresIn;
-        switch (user.role) {
-            case 'ADMIN':
-            case 'MEDECIN':
-                expiresIn = '1d';
-                break;
-            case 'PATIENT':
-            default:
-                expiresIn = '7d';
-        }
-        
-        const token = jwt.sign(payload, Consts.JWT_SECRET, { expiresIn });
-        
-        // Sauvegarde en base pour révocation
-        await prisma.userToken.create({
-            data: {
-                userId: user.id,
-                typeToken: 'ACCESS',
-                tokenHash: token,
-                dateExpiration: new Date(Date.now() + this._getExpirationMs(expiresIn))
-            }
-        });
-        
-        return token;
-    }
-    
-    /**
-     * Vérifie la validité d'un token
-     */
-    static checkToken(token) {
-        try {
-            const payload = jwt.verify(token, Consts.JWT_SECRET);
-            return { isValid: true, payload };
-        } catch (err) {
-            if (err.name === 'TokenExpiredError') {
-                return {
-                    isValid: false,
-                    expired: true,
-                    message: 'Token expiré, veuillez vous reconnecter'
-                };
-            }
-            return { isValid: false, message: 'Token invalide' };
-        }
-    }
-    
-    static _getExpirationMs(expiresIn) {
-        const match = expiresIn.match(/^(\d+)([smhdy])$/);
-        if (!match) return 0;
-        
-        const [_, value, unit] = match;
-        const multipliers = {
-            s: 1000,
-            m: 60 * 1000,
-            h: 60 * 60 * 1000,
-            d: 24 * 60 * 60 * 1000
-        };
-        
-        return parseInt(value, 10) * (multipliers[unit] || 0);
-    }
-}
-
-module.exports = TokenService;
-```
-
-### **`services/SmsService.js`** - Envoi SMS
-**Rôle** : Gérer l'envoi des SMS via l'API LeTexto
-```javascript
-const axios = require('axios');
-const Consts = require('../config/const');
-
-class SmsService {
-    /**
-     * Génère un code OTP
-     */
-    static generateOtp(length = Consts.OTP_CONFIG.length) {
-        const digits = '0123456789';
-        let otp = '';
-        for (let i = 0; i < length; i++) {
-            otp += digits[Math.floor(Math.random() * digits.length)];
-        }
-        return otp;
-    }
-    
-    /**
-     * Envoie un SMS via LeTexto
-     */
-    static async sendSms(phone, message) {
-        try {
-            const { baseUrl, apiKey, sender, countryCode } = Consts.SMS_CONFIG;
-            
-            const endpoint = `/messages/send?token=${apiKey}&from=${sender}&to=${countryCode}${phone}&content=${encodeURIComponent(message)}`;
-            
-            const response = await axios.get(`${baseUrl}${endpoint}`, {
-                timeout: 10000
-            });
-            
-            return {
-                success: true,
-                data: response.data
-            };
-        } catch (error) {
-            console.error('Erreur SMS:', error.message);
-            return {
-                success: false,
-                message: error.message
-            };
-        }
-    }
-    
-    /**
-     * Envoie un code OTP par SMS
-     */
-    static async sendOtp(phone, otp) {
-        const message = `Votre code de vérification Médecins-Patients est: ${otp}. Valable ${Consts.OTP_CONFIG.expirationMinutes} minutes.`;
-        return await this.sendSms(phone, message);
-    }
-}
-
-module.exports = SmsService;
-```
-
----
-
-## 🎯 **`controllers/`** - Logique Métier
-
-### **`controllers/PatientController.js`** - Gestion Patients
-**Rôle** : Toute la logique métier concernant les patients
-```javascript
-const express = require('express');
-const router = express.Router();
-
-// Import des routes spécialisées
-const registerRoute = require('../routes/patients/register');
-const profileRoute = require('../routes/patients/profile');
-const medicalDataRoute = require('../routes/patients/medical-data');
-
-// Organisation modulaire des routes
-router.use('/register', registerRoute);
-router.use('/profile', profileRoute);
-router.use('/medical-data', medicalDataRoute);
-
-module.exports = router;
-```
-
-### **`controllers/MedecinController.js`** - Gestion Médecins
-**Rôle** : Logique métier pour les médecins
-```javascript
-const express = require('express');
-const router = express.Router();
-
-// Import routes médecins
-const searchRoute = require('../routes/medecins/search');
-const availabilityRoute = require('../routes/medecins/availability');
-const validationRoute = require('../routes/medecins/validation');
-
-router.use('/search', searchRoute);
-router.use('/availability', availabilityRoute);
-router.use('/validation', validationRoute);
-
-module.exports = router;
-```
-
----
-
-## 🛣️ **`routes/`** - Endpoints Spécifiques
-
-### **`routes/v1.js`** - Router Principal
-**Rôle** : Point d'entrée de toutes les routes API v1
-```javascript
-const express = require('express');
-const router = express.Router();
-
-// Import des contrôleurs
-const authController = require('../controllers/AuthController');
-const patientController = require('../controllers/PatientController');
-const medecinController = require('../controllers/MedecinController');
-
-// Organisation des routes principales
-router.use('/auth', authController);
-router.use('/patients', patientController);
-router.use('/medecins', medecinController);
-
-// Documentation Swagger
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('../config/swagger');
-router.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-module.exports = router;
-```
-
-### **`routes/patients/profile.js`** - Route Spécifique
-**Rôle** : Endpoint dédié à la gestion du profil patient
-```javascript
+// routes/patients/profile.js
 const express = require('express');
 const router = express.Router();
 const prisma = require('../../prisma/client');
 const ApiResponse = require('../../services/ApiResponse');
-const { authenticate, authorize } = require('../../middleware/authMiddleware');
+const AuthMiddleware = require('../../middleware/authMiddleware');
 const BodyFilter = require('../../middleware/bodyFilterMiddleware');
-
-// Schéma de validation
-const profileSchema = {
-    required: [],
-    allowed: ['nom', 'prenom', 'telephone', 'dateNaissance', 'sexe'],
-    strict: true
-};
 
 /**
  * GET /v1/patients/profile - Récupérer le profil patient
  */
 router.get('/',
-    authenticate(),
-    authorize(['PATIENT']),
+    AuthMiddleware.authenticate(),
+    AuthMiddleware.authorize(['PATIENT']),
     async (req, res) => {
         try {
             const patient = await prisma.patient.findUnique({
                 where: { userId: req.user.id },
-                include: {
-                    user: {
-                        select: {
-                            nom: true,
-                            prenom: true,
-                            email: true,
-                            telephone: true
-                        }
-                    }
-                }
+                include: { user: true }
             });
             
             if (!patient) {
@@ -627,11 +326,10 @@ router.get('/',
             
             return ApiResponse.success(res, 'Profil récupéré', {
                 id: patient.id,
-                ...patient.user,
-                dateNaissance: patient.dateNaissance,
-                sexe: patient.sexe
+                nom: patient.user.nom,
+                prenom: patient.user.prenom,
+                // ... autres données
             });
-            
         } catch (error) {
             console.error('Erreur récupération profil:', error);
             return ApiResponse.serverError(res, 'Erreur serveur');
@@ -643,40 +341,16 @@ router.get('/',
  * PUT /v1/patients/profile - Mettre à jour le profil
  */
 router.put('/',
-    authenticate(),
-    authorize(['PATIENT']),
-    BodyFilter.filter(profileSchema),
+    AuthMiddleware.authenticate(),
+    AuthMiddleware.authorize(['PATIENT']),
+    BodyFilter.validate(profileSchema),
     async (req, res) => {
         try {
-            const { nom, prenom, telephone, dateNaissance, sexe } = req.body;
+            const { nom, prenom, dateNaissance, sexe } = req.body;
             
-            // Mise à jour User
-            const updatedUser = await prisma.user.update({
-                where: { id: req.user.id },
-                data: {
-                    nom: nom || req.user.nom,
-                    prenom: prenom || req.user.prenom,
-                    telephone: telephone || req.user.telephone
-                }
-            });
+            // Logique de mise à jour...
             
-            // Mise à jour Patient
-            const updatedPatient = await prisma.patient.update({
-                where: { userId: req.user.id },
-                data: {
-                    dateNaissance: dateNaissance ? new Date(dateNaissance) : undefined,
-                    sexe: sexe || undefined
-                }
-            });
-            
-            return ApiResponse.success(res, 'Profil mis à jour', {
-                nom: updatedUser.nom,
-                prenom: updatedUser.prenom,
-                telephone: updatedUser.telephone,
-                dateNaissance: updatedPatient.dateNaissance,
-                sexe: updatedPatient.sexe
-            });
-            
+            return ApiResponse.success(res, 'Profil mis à jour', updatedData);
         } catch (error) {
             console.error('Erreur mise à jour profil:', error);
             return ApiResponse.serverError(res, 'Erreur serveur');
@@ -687,151 +361,429 @@ router.put('/',
 module.exports = router;
 ```
 
----
-
-## 🔗 Processus Complet : Créer un Endpoint
-
-### Étape 1 : Créer la Route Spécifique
+#### Étape 3 : Intégrer au Controller
 ```javascript
-// routes/medecins/search.js
+// controllers/PatientController.js
 const express = require('express');
 const router = express.Router();
-const prisma = require('../../prisma/client');
-const ApiResponse = require('../../services/ApiResponse');
 
-router.get('/', async (req, res) => {
-    try {
-        const { specialite, ville, latitude, longitude } = req.query;
-        
-        const medecins = await prisma.medecin.findMany({
-            where: {
-                statutValidation: 'VALIDE',
-                specialites: specialite ? { contains: specialite } : undefined
-            },
-            include: {
-                user: {
-                    select: { nom: true, prenom: true }
-                },
-                clinique: true
-            }
-        });
-        
-        return ApiResponse.success(res, 'Médecins trouvés', medecins);
-    } catch (error) {
-        return ApiResponse.serverError(res, 'Erreur recherche');
-    }
-});
+const profileRoute = require('../routes/patients/profile');
+const medicalDataRoute = require('../routes/patients/medical-data');
+
+// Montage des routes spécialisées
+router.use('/profile', profileRoute);
+router.use('/medical-data', medicalDataRoute);
 
 module.exports = router;
 ```
 
-### Étape 2 : Ajouter au Contrôleur
-```javascript
-// controllers/MedecinController.js
-const searchRoute = require('../routes/medecins/search');
-router.use('/search', searchRoute);
-```
-
-### Étape 3 : Connecter au Router Principal
+#### Étape 4 : Connecter au Router Principal
 ```javascript
 // routes/v1.js
-const medecinController = require('../controllers/MedecinController');
-router.use('/medecins', medecinController);
+const patientController = require('../controllers/PatientController');
+router.use('/patients', patientController);
 ```
 
-### Étape 4 : Le Router est déjà connecté à app.js
+#### Étape 5 : Créer la Documentation Swagger
+```yaml
+# swagger/patients/profile.yaml
+openapi: 3.0.0
+paths:
+  /v1/patients/profile:
+    get:
+      tags:
+        - Patients
+      summary: Récupérer le profil patient
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profil récupéré avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Profil récupéré"
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nom:
+                        type: string
+                      prenom:
+                        type: string
+```
+
+#### Étape 6 : Tester et Valider
+```bash
+# Tests manuels
+curl -X GET http://localhost:3000/v1/patients/profile \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Tests automatisés
+npm test -- routes/patients/profile.test.js
+```
+
+### 🔄 Résultat : Endpoint Accessible
+```
+GET /v1/patients/profile
+PUT /v1/patients/profile
+```
+
+### 📝 Conventions de Code
+
+#### Nomenclature des Fichiers
+- **Routes** : `kebab-case.js` (ex: `medical-data.js`)
+- **Controllers** : `PascalCase.js` (ex: `PatientController.js`)
+- **Services** : `PascalCase.js` (ex: `TokenService.js`)
+
+#### Structure des Réponses API
 ```javascript
-// app.js
-const v1Router = require('./routes/v1');
-app.use('/v1', v1Router);
-```
+// Succès
+ApiResponse.success(res, message, data)
+// {
+//   "success": true,
+//   "message": "...",
+//   "data": {...},
+//   "timestamp": "2024-01-15T14:30:22.123Z"
+// }
 
-### Résultat : Endpoint Accessible
-```
-GET /v1/medecins/search?specialite=CARDIOLOGIE&ville=Abidjan
-```
-
----
-
-## 📋 Fichiers de Base Obligatoires
-
-### Configuration Minimum
-```
-├── 📁 .env                    # Variables d'environnement
-├── 📁 package.json           # Dépendances npm
-├── 📁 app.js                 # Point d'entrée Express
-├── 📁 bin/www                # Serveur HTTP
-└── 📁 config/
-    ├── const.js              # Constantes globales
-    └── swagger.js            # Documentation API
-```
-
-### Structure Prisma
-```
-└── 📁 prisma/
-    ├── schema.prisma         # Modèle de données
-    ├── client.js             # Client Prisma
-    └── migrations/           # Évolutions base
-```
-
-### Services Essentiels
-```
-└── 📁 services/
-    ├── ApiResponse.js        # Réponses standardisées
-    ├── TokenService.js       # Gestion JWT
-    └── SmsService.js         # SMS LeTexto
-```
-
-### Middleware Sécuritaire
-```
-└── 📁 middleware/
-    ├── authMiddleware.js     # Auth + autorisation
-    └── bodyFilterMiddleware.js # Validation données
-```
-
-### Architecture Routes
-```
-└── 📁 routes/
-    ├── v1.js                 # Router principal
-    └── 📁 [domaine]/         # Routes par domaine métier
-        └── [endpoint].js     # Endpoint spécifique
-```
-
-### Contrôleurs Métier
-```
-└── 📁 controllers/
-    ├── AuthController.js     # Authentification
-    ├── PatientController.js  # Logique patients
-    └── MedecinController.js  # Logique médecins
+// Erreur
+ApiResponse.badRequest(res, message, data)
+// {
+//   "success": false,
+//   "error": "BAD_REQUEST",
+//   "message": "...",
+//   "data": {...},
+//   "timestamp": "2024-01-15T14:30:22.123Z"
+// }
 ```
 
 ---
 
-## 🚀 Scripts de Démarrage
+## 📊 Phases de Développement
 
-### package.json
-```json
-{
-  "name": "medecins-patients-backend",
-  "scripts": {
-    "start": "node ./bin/www",
-    "dev": "nodemon ./bin/www",
-    "db:migrate": "npx prisma migrate dev",
-    "db:generate": "npx prisma generate",
-    "db:seed": "node prisma/seed.js"
-  },
-  "dependencies": {
-    "express": "^4.21.2",
-    "prisma": "^6.12.0",
-    "@prisma/client": "^6.12.0",
-    "jsonwebtoken": "^9.0.2",
-    "bcrypt": "^6.0.0",
-    "axios": "^1.10.0",
-    "express-validator": "^7.2.1",
-    "swagger-ui-express": "^5.0.1",
-    "swagger-jsdoc": "^6.2.8"
-  }
-}
+### 🚀 Phase P1A - MVP Core (CRITIQUE)
+
+**Objectif** : Fonctionnalités essentielles pour la mise en ligne
+
+#### Endpoints Prioritaires
+1. **`POST /v1/auth/otp/send`** ✅ - Envoi codes OTP
+2. **`POST /v1/auth/otp/verify`** ✅ - Vérification OTP + connexion patients
+3. **`POST /v1/auth/register/patient`** ✅ - Inscription patients (SANS password)
+4. **`POST /v1/auth/login`** ✅ - Connexion médecins/admins (AVEC password)
+5. **`GET /v1/auth/me`** ✅ - Informations utilisateur connecté
+
+#### User Stories Couvertes
+- **Patients** : Inscription OTP, connexion simple
+- **Médecins** : Connexion avec email/password
+- **Base** : Authentification sécurisée
+
+#### Critères de Validation P1A
+- [ ] Inscription patient fonctionnelle
+- [ ] Connexion OTP patients opérationnelle  
+- [ ] Connexion email/password médecins/admins
+- [ ] Tokens JWT générés et validés
+- [ ] Documentation Swagger complète
+- [ ] Tests unitaires passants
+
+---
+
+### 🔧 Phase P1B - Fonctionnalités Avancées (HAUTE)
+
+**Objectif** : Compléter l'authentification et ajouter la gestion des profils
+
+#### Endpoints à Développer
+6. **`POST /v1/auth/register/medecin`** - Inscription médecins avec validation admin
+7. **`POST /v1/auth/refresh`** - Renouvellement tokens
+8. **`POST /v1/auth/logout`** - Déconnexion sécurisée
+9. **`GET /v1/auth/sessions`** - Gestion sessions actives
+10. **`GET /v1/patients/profile`** - Profil patient
+11. **`PUT /v1/patients/profile`** - Mise à jour profil
+12. **`GET /v1/medecins/validation-status`** - Statut validation médecin
+
+#### User Stories Couvertes
+- **Médecins** : Inscription complète avec validation
+- **Patients** : Gestion profil personnel
+- **Sécurité** : Gestion fine des sessions
+
+---
+
+### 🎯 Phase P2 - Recherche et Rendez-vous (HAUTE)
+
+**Objectif** : Cœur métier de la mise en relation
+
+#### Endpoints à Développer
+13. **`GET /v1/doctors/search`** - Recherche médecins multi-critères
+14. **`GET /v1/doctors/{id}/details`** - Détails médecin
+15. **`GET /v1/doctors/{id}/available-slots`** - Créneaux disponibles
+16. **`POST /v1/appointments/request`** - Demande rendez-vous
+17. **`PUT /v1/appointments/{id}/respond`** - Réponse médecin
+18. **`GET /v1/appointments`** - Liste rendez-vous utilisateur
+19. **`DELETE /v1/appointments/{id}/cancel`** - Annulation
+20. **`PUT /v1/appointments/{id}/reschedule`** - Reprogrammation
+
+#### User Stories Couvertes
+- **Patients** : Recherche médecins, prise RDV
+- **Médecins** : Gestion agenda, réponses demandes
+- **Système** : Notifications automatiques
+
+---
+
+### 💼 Phase P3 - Administration et Validation (MOYENNE)
+
+**Objectif** : Outils administratifs et validation des comptes
+
+#### Endpoints à Développer
+21. **`GET /v1/admin/doctors/pending`** - Médecins en attente
+22. **`PUT /v1/admin/doctors/{id}/validate`** - Validation compte médecin
+23. **`PUT /v1/admin/doctors/{id}/suspend`** - Suspension compte
+24. **`GET /v1/admin/patients`** - Gestion patients
+25. **`GET /v1/admin/analytics`** - Tableaux de bord
+26. **`GET /v1/admin/reports`** - Rapports d'activité
+
+#### User Stories Couvertes
+- **Admins** : Validation médecins, modération
+- **Système** : Analytics et reporting
+- **Sécurité** : Audit et conformité
+
+---
+
+### 🚀 Phase P4 - Fonctionnalités Avancées (BASSE)
+
+**Objectif** : Optimisations et fonctionnalités premium
+
+#### Endpoints à Développer
+27. **`POST /v1/consultations/{id}/prescription`** - Ordonnances numériques
+28. **`POST /v1/evaluations`** - Système d'évaluation
+29. **`GET /v1/emergency/pharmacies`** - Services d'urgence
+30. **`POST /v1/ai-health/conversation`** - IA Santé (optionnel)
+31. **`GET /v1/routes/calculate`** - Calcul itinéraires domicile
+
+#### User Stories Couvertes
+- **Médecins** : Ordonnances numériques, consultations domicile
+- **Patients** : Évaluations, services urgence, IA santé
+- **Système** : Géolocalisation, contenu premium
+
+---
+
+## 🚀 Guide de Démarrage
+
+### Prérequis
+- **Node.js** 18.x ou supérieur
+- **MySQL** 8.0
+- **npm** ou **yarn**
+
+### Installation
+
+```bash
+# 1. Cloner le repository
+git clone <repository-url>
+cd medecins-patients-backend
+
+# 2. Installer les dépendances
+npm install
+
+# 3. Configurer les variables d'environnement
+cp .env.example .env
+# Éditer .env avec vos configurations
+
+# 4. Configurer la base de données
+npx prisma migrate dev
+npx prisma generate
+
+# 5. (Optionnel) Alimenter avec des données de test
+npm run db:seed
+
+# 6. Démarrer en mode développement
+npm run dev
 ```
 
-Cette architecture te donne une base solide pour développer tous tes endpoints selon le pattern établi : Route → Contrôleur → Service → Base de données.
+### Variables d'Environnement Essentielles
+
+```bash
+# Base de données
+DATABASE_URL="mysql://user:password@localhost:3306/medecins_patients"
+
+# JWT Secrets (différents par environnement)
+JWT_SECRET_DEV="your-dev-secret-key"
+JWT_SECRET_TEST="your-test-secret-key"
+JWT_SECRET_PROD="your-prod-secret-key"
+
+# API LeTexto (SMS)
+LETEXTO_API_URL="https://api.letexto.com"
+LETEXTO_API_KEY="your-letexto-api-key"
+
+# Environnement
+NODE_ENV="development"
+```
+
+### Scripts Disponibles
+
+```bash
+npm start              # Production (node)
+npm run dev            # Développement (nodemon)
+npm run db:migrate     # Migrations Prisma
+npm run db:generate    # Génération client Prisma
+npm run db:seed        # Données de test
+npm test               # Tests automatisés
+```
+
+---
+
+## 📖 Documentation API
+
+### Accès à la Documentation
+- **Swagger UI** : `http://localhost:3000/v1/api-docs`
+- **Endpoint info** : `http://localhost:3000/v1/info`
+- **Test connectivité** : `http://localhost:3000/v1/ping`
+
+### Authentification dans Swagger
+1. Obtenir un token via `/v1/auth/otp/verify` ou `/v1/auth/login`
+2. Cliquer sur "Authorize" dans Swagger UI
+3. Saisir : `Bearer YOUR_JWT_TOKEN`
+
+### Exemples de Requêtes
+
+#### Inscription Patient
+```bash
+# 1. Demander un code OTP
+curl -X POST http://localhost:3000/v1/auth/otp/send \
+  -H "Content-Type: application/json" \
+  -d '{"telephone": "0102030405"}'
+
+# 2. Vérifier le code (si patient inexistant)
+curl -X POST http://localhost:3000/v1/auth/otp/verify \
+  -H "Content-Type: application/json" \
+  -d '{"telephone": "0102030405", "otp": "1234"}'
+
+# 3. Créer le compte patient
+curl -X POST http://localhost:3000/v1/auth/register/patient \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nom": "Kouassi",
+    "prenom": "Jean",
+    "telephone": "0102030405",
+    "email": "jean@example.com"
+  }'
+```
+
+#### Connexion Médecin
+```bash
+curl -X POST http://localhost:3000/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "dr.fatou@example.com",
+    "password": "motdepasse123"
+  }'
+```
+
+---
+
+## 🧪 Tests
+
+### Types de Tests
+- **Unitaires** : Services et utilitaires
+- **Intégration** : Endpoints complets
+- **Validation** : Middleware et schémas
+
+### Structure des Tests
+```
+test/
+├── unit/
+│   ├── services/
+│   └── middleware/
+├── integration/
+│   ├── auth/
+│   └── patients/
+└── fixtures/
+    └── test-data.js
+```
+
+### Lancer les Tests
+```bash
+# Tous les tests
+npm test
+
+# Tests spécifiques
+npm test -- --grep "auth"
+npm test -- test/integration/auth/
+
+# Avec couverture
+npm run test:coverage
+```
+
+---
+
+## 🔧 Déploiement
+
+### Environnements
+
+#### Développement
+- **Port** : 3000
+- **Base** : MySQL locale
+- **JWT** : Secret développement
+- **SMS** : Mode test LeTexto
+
+#### Test
+- **Port** : 3001  
+- **Base** : MySQL de test
+- **JWT** : Secret test
+- **SMS** : Sandbox
+
+#### Production
+- **Port** : 8080
+- **Base** : MySQL production
+- **JWT** : Secret production sécurisé
+- **SMS** : API LeTexto production
+
+### Build et Déploiement
+```bash
+# Préparer pour production
+npm run build
+
+# Migrations production
+npx prisma migrate deploy
+
+# Démarrer en production
+npm start
+```
+
+---
+
+## 🤝 Contribution
+
+### Standards de Code
+- **ESLint** : Configuration standard
+- **Prettier** : Formatage automatique
+- **Commits** : Convention conventionnelle
+
+### Processus de Développement
+1. **Branche** : Créer depuis `develop`
+2. **Feature** : Développer selon workflow
+3. **Tests** : Ajouter tests unitaires
+4. **Documentation** : Mettre à jour Swagger
+5. **PR** : Pull request avec revue
+6. **Merge** : Après validation
+
+### Contact
+- **Équipe** : LYCORIS GROUP
+- **Documentation** : Voir `/swagger/` pour détails API
+- **Issues** : Reporter via Git issues
+
+---
+
+## 📄 Licence
+
+Propriété de **LYCORIS GROUP** - Tous droits réservés.
+
+---
+
+*Documentation mise à jour le 22 juillet 2025*

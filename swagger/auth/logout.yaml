@@ -1,0 +1,221 @@
+openapi: 3.0.0
+info:
+  title: Logout API
+  description: Déconnexion globale avec révocation de tous les tokens actifs
+  version: 1.0.0
+
+paths:
+  /v1/auth/logout:
+    post:
+      tags:
+        - Authentification
+      summary: Se déconnecter (révocation globale des tokens)
+      description: |
+        Déconnecte l'utilisateur en révoquant TOUS ses tokens actifs (ACCESS + REFRESH).
+
+      security:
+        - bearerAuth: []
+
+      responses:
+        '200':
+          description: Déconnexion réussie - Tous les tokens révoqués
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Déconnexion réussie"
+                  data:
+                    type: object
+                    properties:
+                      logoutInfo:
+                        type: object
+                        properties:
+                          userId:
+                            type: string
+                            example: "uuid-user-123"
+                          userRole:
+                            type: string
+                            enum: [PATIENT, MEDECIN, ADMIN]
+                            example: "PATIENT"
+                          tokensRevoked:
+                            type: integer
+                            description: Nombre de tokens révoqués
+                            example: 3
+                          logoutTime:
+                            type: string
+                            format: date-time
+                            example: "2024-01-15T14:30:22.123Z"
+                          ip:
+                            type: string
+                            example: "192.168.1.100"
+                      securityInfo:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Tous vos tokens d'accès ont été révoqués"
+                          action:
+                            type: string
+                            example: "Vous devez vous reconnecter pour accéder à nouveau à l'application"
+                          affectedDevices:
+                            type: string
+                            example: "Tous les appareils connectés"
+                      nextSteps:
+                        type: array
+                        items:
+                          type: string
+                        example:
+                          - "Reconnectez-vous avec vos identifiants"
+                          - "Vos sessions sur tous les appareils ont été fermées"
+                          - "Cette action améliore la sécurité de votre compte"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T14:30:22.123Z"
+              examples:
+                patient_logout:
+                  summary: Déconnexion réussie d'un patient
+                  value:
+                    success: true
+                    message: "Déconnexion réussie"
+                    data:
+                      logoutInfo:
+                        userId: "uuid-patient-123"
+                        userRole: "PATIENT"
+                        tokensRevoked: 2
+                        logoutTime: "2024-01-15T14:30:22.123Z"
+                        ip: "192.168.1.100"
+                      securityInfo:
+                        message: "Tous vos tokens d'accès ont été révoqués"
+                        action: "Vous devez vous reconnecter pour accéder à nouveau à l'application"
+                        affectedDevices: "Tous les appareils connectés"
+                      nextSteps:
+                        - "Reconnectez-vous avec vos identifiants"
+                        - "Vos sessions sur tous les appareils ont été fermées"
+                        - "Cette action améliore la sécurité de votre compte"
+                    timestamp: "2024-01-15T14:30:22.123Z"
+                medecin_logout:
+                  summary: Déconnexion réussie d'un médecin
+                  value:
+                    success: true
+                    message: "Déconnexion réussie"
+                    data:
+                      logoutInfo:
+                        userId: "uuid-medecin-456"
+                        userRole: "MEDECIN"
+                        tokensRevoked: 4
+                        logoutTime: "2024-01-15T14:30:22.123Z"
+                        ip: "192.168.1.100"
+                      securityInfo:
+                        message: "Tous vos tokens d'accès ont été révoqués"
+                        action: "Vous devez vous reconnecter pour accéder à nouveau à l'application"
+                        affectedDevices: "Tous les appareils connectés"
+                      nextSteps:
+                        - "Reconnectez-vous avec vos identifiants"
+                        - "Vos sessions sur tous les appareils ont été fermées"
+                        - "Cette action améliore la sécurité de votre compte"
+                    timestamp: "2024-01-15T14:30:22.123Z"
+                admin_logout:
+                  summary: Déconnexion réussie d'un admin
+                  value:
+                    success: true
+                    message: "Déconnexion réussie"
+                    data:
+                      logoutInfo:
+                        userId: "uuid-admin-789"
+                        userRole: "ADMIN"
+                        tokensRevoked: 1
+                        logoutTime: "2024-01-15T14:30:22.123Z"
+                        ip: "192.168.1.100"
+                      securityInfo:
+                        message: "Tous vos tokens d'accès ont été révoqués"
+                        action: "Vous devez vous reconnecter pour accéder à nouveau à l'application"
+                        affectedDevices: "Tous les appareils connectés"
+                      nextSteps:
+                        - "Reconnectez-vous avec vos identifiants"
+                        - "Vos sessions sur tous les appareils ont été fermées"
+                        - "Cette action améliore la sécurité de votre compte"
+                    timestamp: "2024-01-15T14:30:22.123Z"
+
+        '401':
+          description: Token d'authentification manquant ou invalide
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    enum: ["UNAUTHORIZED"]
+                  message:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+              examples:
+                token_manquant:
+                  summary: "Token d'authentification manquant"
+                  value:
+                    success: false
+                    error: "UNAUTHORIZED"
+                    message: "Token d'authentification requis"
+                    timestamp: "2024-01-15T14:30:22.123Z"
+                token_invalide:
+                  summary: "Token invalide ou expiré"
+                  value:
+                    success: false
+                    error: "UNAUTHORIZED"
+                    message: "Token expiré, veuillez vous reconnecter"
+                    timestamp: "2024-01-15T14:30:22.123Z"
+                utilisateur_inexistant:
+                  summary: "Utilisateur du token non trouvé"
+                  value:
+                    success: false
+                    error: "UNAUTHORIZED"
+                    message: "Utilisateur non trouvé ou inactif"
+                    timestamp: "2024-01-15T14:30:22.123Z"
+
+        '500':
+          description: Erreur serveur interne
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    enum: ["INTERNAL_SERVER_ERROR"]
+                  message:
+                    type: string
+                    example: "Erreur interne lors de la déconnexion"
+                  timestamp:
+                    type: string
+                    format: date-time
+              examples:
+                erreur_serveur:
+                  summary: "Erreur serveur générique"
+                  value:
+                    success: false
+                    error: "INTERNAL_SERVER_ERROR"
+                    message: "Erreur interne lors de la déconnexion"
+                    timestamp: "2024-01-15T14:30:22.123Z"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT d'accès obtenu lors de la connexion

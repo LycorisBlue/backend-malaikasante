@@ -11,19 +11,21 @@
     "db:seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "prisma": "^6.12.0",
     "@prisma/client": "^6.12.0",
-    "jsonwebtoken": "^9.0.2",
-    "bcrypt": "^6.0.0",
     "axios": "^1.10.0",
-    "express-validator": "^7.2.1",
-    "swagger-ui-express": "^5.0.1",
-    "swagger-jsdoc": "^6.2.8",
-    "morgan": "^1.10.1",
+    "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.6",
+    "dayjs": "^1.11.13",
     "dotenv": "^16.4.5",
-    "dayjs": "^1.11.13"
+    "express": "^4.21.2",
+    "express-validator": "^7.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "minio": "^8.0.5",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "prisma": "^6.12.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
