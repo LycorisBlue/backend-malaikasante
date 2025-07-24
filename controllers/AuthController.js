@@ -9,6 +9,10 @@ const loginRoute = require('../routes/auth/login');
 const refreshRoute = require('../routes/auth/refresh');
 const logoutRoute = require('../routes/auth/logout');
 const meRoute = require('../routes/auth/me');
+const passwordRoute = require('../routes/auth/password-forgot');
+const sessionsRoute = require('../routes/auth/sessions');
+
+
 
 // Organisation des routes OTP
 router.use('/otp/send', otpSendRoute);
@@ -29,5 +33,11 @@ router.use('/logout', logoutRoute);
 
 // Route pour obtenir les informations de l'utilisateur connecté
 router.use('/me', meRoute);
+
+// Route pour la gestion du mot de passe oublié
+router.use('/password', passwordRoute);
+
+// Route pour lister les sessions actives
+router.use('/sessions', sessionsRoute);
 
 module.exports = router;
